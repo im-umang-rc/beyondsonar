@@ -9,7 +9,6 @@ import json
 def latext_format():
     dev_report_latex = """
     output a tex document given this template, use the json output to replace the template strings in <>:
-    latex```
     \\documentclass{article}
     \\usepackage[margin=1in]{geometry}
     \\usepackage{enumitem}
@@ -36,12 +35,10 @@ def latext_format():
     \\end{itemize}
 
     \\end{document}
-    ```
     """
 
     manager_report_latex = """
     output a tex document given this template, use the json output to replace the template strings in <>:
-    latex```
     \\documentclass{article}
     \\usepackage[margin=1in]{geometry}
     \\usepackage{enumitem}
@@ -65,7 +62,6 @@ def latext_format():
     \\end{itemize}
 
     \\end{document}
-    ```
     """
 
     return dev_report_latex, manager_report_latex
