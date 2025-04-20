@@ -1,6 +1,6 @@
 import os
 
-from knowledge import Knowledge
+from rag.knowledge import Knowledge
 from dotenv import load_dotenv
 from qdrant_client import models, QdrantClient
 from sentence_transformers import SentenceTransformer, CrossEncoder

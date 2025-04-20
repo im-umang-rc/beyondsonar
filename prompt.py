@@ -1,10 +1,10 @@
-from beyondsonar.model import GenerativeModel
-from vector import retriever
+from model import GenerativeModel
+# from vector import retriever
 import json
-import langchain
-langchain.verbose = False
-langchain.debug = False
-langchain.llm_cache = False
+# import langchain
+# langchain.verbose = False
+# langchain.debug = False
+# langchain.llm_cache = False
 
 def latext_format():
     dev_report_latex = """
@@ -80,10 +80,14 @@ def prompt():
         You are skilled at diagnosing security bugs.
         You are capable of suggesting solutions to fix these bugs. 
         You are highly capable, thoughtful and precise at your job. 
-        Your goal is to deeply understand the security issue at hand, think step-by-step through 
-        complex problems, provide clear and accurate answers. 
+        Your goal is to deeply understand the security issue at hand from the <Hotspot> section only.
+        Think step-by-step through the issues reported in <Hotspot> and use the information provided in <Context> to augment your understanding of the issue and potential fix.
+        Provide clear and accurate answers.
         Always prioritize being truthful, nuanced, insightful, and efficient. 
-        If you do not know the answer, simply say "I do not know".
+        Use only the content provided to you in terms of <Hotspots> section and <Context> section.
+        Always follow the above rules.
+        Do not deviate.
+    
 
         A hotspot in a code file is defined as below:
 
@@ -108,6 +112,10 @@ def prompt():
             It analyzes the code complexity, the bugs, technical debt and potential hotspots. 
         </Sonar Qube>
 
+        <Context>
+            Context is the owasp recommendations for steps needed to fix the issues reported in hotspots. You are to only use this to better undestand the hotspot issues at hand and ways to fix them.
+        </Context>
+
     </System instructions>
     
     """
@@ -128,15 +136,15 @@ def prompt():
             "count": <total count of the vulnerability hotspots in integer format>,
             "p1Count": <count of high priority issues that can lead to security incidents in production leading to data loss, reputation loss>,
             "p2Count": <count of vulnerability hotspots whose fix can be postponed in favor of other priority issues and bugs but they still need to be addressed eventually>,
-            "top5": <Array that will contain only the top 5 most pressing vulnerabilities, start picking them from the P1s and then move onto P2s if no P1s remain, refer "Top5 Array Json" for the format>,
-            "assessment": <A 2 line sentence that highlights the most pressing issues in the project and informs if this is production ready. This is to be read by a manager who might not undestand the technicalities being the issues.>
+            "top5": <Array that will contain only the top 5 most pressing vulnerabilities, start picking them from the P1s and then move onto P2s if no P1s remain, refer "top5" for the format>,
+            "assessment": <A paragraph that highlights the most pressing issues in the project and informs if this is production ready. Production readiness is defined as absence of P1s. This needs to be read by the developers who need to understand why the project is not production ready by using the most pressing issues and the steps needed to make it production ready.>
         }
 
-        "Top5": {
+        "top5": {
             {
-                "issue": <a brief description of what the issue is, limit to a single sentence>,
-                "fixSteps": <A one sentence solution to fix the issue. The description is aimed at developers who will be reading this to fix the issue.>,
-                "consequences": <A one sentence description of the harms this issue can cause. Why is this a P1/ P2. The description is aimed at managers who might not understand the technicalities behind the issue>,
+                "issue": <a brief description of what the issue is>,
+                "consequences": <An in-depth description of the harms this issue can cause with reference to the context provided to you. Why is this a P1/ P2. This description is aimed at developers, ensure you are explaining the technicalities of what harms this can cause in production.>,
+                "fixSteps": <Possible solutions (max 3) with in-depth steps to fix the issue. The description is aimed at developers who will be reading this to fix the issue.>,
                 "priority": <one of P1 or P2 based on the severity. P1s can lead to security incidents in production leading to data loss, reputation loss. P2s can be postponed in favor of other priority issues but still need to be addressed eventually>
             },
             <repeat for a total of 5 issues in the array, start from P1s and include P2s to meet the count of 5.>
