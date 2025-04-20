@@ -17,7 +17,7 @@ with open('config.json') as config_file:
     config_data = json.load(config_file)
     app.config.update(config_data)
 
-@app.route("/start", methods=["GET"])
+@app.route("/report", methods=["GET"])
 def start():
 
 	# authenticate with Sonar
