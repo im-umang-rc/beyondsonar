@@ -1,6 +1,8 @@
 from model import GenerativeModel
 # from vector import retriever
 import json
+
+from rag.rag_client import RagClient
 # import langchain
 # langchain.verbose = False
 # langchain.debug = False
@@ -8,7 +10,7 @@ import json
 
 def latext_format():
     dev_report_latex = """
-    output a tex document given this template, use the json output to replace the template strings in <>:
+    output a tex document given this template, use the json output to replace the template strings in <>. Only replace the template strings, do not add new latex formatting.:
     \\documentclass{article}
     \\usepackage[margin=1in]{geometry}
     \\usepackage{enumitem}
@@ -38,7 +40,7 @@ def latext_format():
     """
 
     manager_report_latex = """
-    output a tex document given this template, use the json output to replace the template strings in <>:
+    output a tex document given this template, use the json output to replace the template strings in <>. Only replace the template strings, do not add new latex formatting.:
     \\documentclass{article}
     \\usepackage[margin=1in]{geometry}
     \\usepackage{enumitem}
@@ -68,113 +70,133 @@ def latext_format():
 
 def prompt():
 
-    system_message = """
-    <System instructions>
+    return  """
+    <System Instructions>
 
         You are a Senior Security Analyst. 
         You are skilled at identifying issues related to security.
-        You are skilled at diagnosing security bugs.
-        You are capable of suggesting solutions to fix these bugs. 
+        You are skilled at diagnosing security hotspots.
+        You are capable of suggesting solutions to fix these hotspots. 
         You are highly capable, thoughtful and precise at your job. 
         Your goal is to deeply understand the security issue at hand from the <Hotspot> section only.
-        Think step-by-step through the issues reported in <Hotspot> and use the information provided in <Context> to augment your understanding of the issue and potential fix.
-        Provide clear and accurate answers.
-        Always prioritize being truthful, nuanced, insightful, and efficient. 
-        Use only the content provided to you in terms of <Hotspots> section and <Context> section.
+        Think step-by-step through the issues reported in <Hotspot> and use the information provided in <Context>, <Source Code> and <Previous Response> to augment your understanding of the issue and potential fix.
+        Rspond only in JSON ALWAYS
+        Always prioritize being truthful, nuanced, insightful, and efficient.
         Always follow the above rules.
-        Do not deviate.
-    
+        Do NOT deviate.
+
 
         A hotspot in a code file is defined as below:
 
         <Hotspot>
-            A piece of code which is likely to be a security issue as identified by Sonar QUBE.
+            A piece of code which is a security issue as identified by static code analyzer.
 
             It will at least have the following fields: 
 
-            {   
-                "component" : {
-                    "key" : "The exact location of the hotspot in terms of file location."
+            {
+                "rule":{
+                    "name" : "A description of what the hotspot is",
+                    "riskDescription" : "The description of the risks posed by utilizing the current code in this context",
+                    "vulnerabilityDescription" : "Questions to evaluate if the current usage of this piece of code leads to a vulnerability."
                 }
-                "name" : "A description of what the hotspot is.",
-                "riskDescription" : "The description of the risks posed by utilizing the current code in this context.",
-                "vulnerabilityDescription" : "Questions to evaluate if the current usage of this piece of code leads to a vulnerability.",
             }
 
         </Hotspot>
-
-        <Sonar Qube>
-            Sonar QUBE is a software that integrates into the CI/CD pipeline to analyze code.
-            It analyzes the code complexity, the bugs, technical debt and potential hotspots. 
-        </Sonar Qube>
+        
+        <Source Code>
+            This will contain the exact block of source code that caused the hotspot to be flagged by the static code analyzer.
+        </Source Code>
 
         <Context>
             Context is the owasp recommendations for steps needed to fix the issues reported in hotspots. You are to only use this to better undestand the hotspot issues at hand and ways to fix them.
         </Context>
-
-    </System instructions>
-    
+        
+        <Previous Response>
+            This section will contain the reponses you provided to the user seperated by dashes ('---------').
+            Use this as additional context to provide meaningful reponses.
+        </Previous Response>
+            
+    </System Instructions>	
     """
 
-    dev_output_structure_json = """
+def prompt_issue_identify(hotspot: str, source_code: str) -> str:
+    return f"""
+    <Hotspot>
+        {hotspot}
+    </Hotspot>
 
-    <Output Structure>
-        You are supposed to return a report in JSON format. 
-        The output will be a report, structured as JSON, whose format is given below.
-        Avoid any extra back-ticks "`" or any other keywords like "JSON" in the output.
-        Do 'NOT' use any special characters inside the JSON. 
-        Follow the output structure as indicated by the JSON format.
-        Each fields description is provided to you to help you make the report. 
+    <Source Code>
+        {source_code}
+    </Source Code>
 
-        given a Json output which is in following format, <> represents a string template that will be replaced with actual content:
+    Given this hotspot response from Sonar, identify the core issue of this hotspot. 
 
-        {
-            "count": <total count of the vulnerability hotspots in integer format>,
-            "p1Count": <count of high priority issues that can lead to security incidents in production leading to data loss, reputation loss>,
-            "p2Count": <count of vulnerability hotspots whose fix can be postponed in favor of other priority issues and bugs but they still need to be addressed eventually>,
-            "top5": <Array that will contain only the top 5 most pressing vulnerabilities, start picking them from the P1s and then move onto P2s if no P1s remain, refer "top5" for the format>,
-            "assessment": <A paragraph that highlights the most pressing issues in the project and informs if this is production ready. Production readiness is defined as absence of P1s. This needs to be read by the developers who need to understand why the project is not production ready by using the most pressing issues and the steps needed to make it production ready.>
-        }
+    Respond in the following JSON format only:
 
-        "top5": {
-            {
-                "issue": <a brief description of what the issue is>,
-                "consequences": <An in-depth description of the harms this issue can cause with reference to the context provided to you. Why is this a P1/ P2. This description is aimed at developers, ensure you are explaining the technicalities of what harms this can cause in production.>,
-                "fixSteps": <Possible solutions (max 3) with in-depth steps to fix the issue. The description is aimed at developers who will be reading this to fix the issue.>,
-                "priority": <one of P1 or P2 based on the severity. P1s can lead to security incidents in production leading to data loss, reputation loss. P2s can be postponed in favor of other priority issues but still need to be addressed eventually>
-            },
-            <repeat for a total of 5 issues in the array, start from P1s and include P2s to meet the count of 5.>
-        }
-
-    </Output Structure>
-    
+    {{
+        "issue": <description of the issue>,
+        "reason": <description of why is it an issue>
+    }}
     """
 
-    manager_output_structure_json = """
-        given a Json output which is in following format, <> represents a string template that will be replaced with actual content:
+def prompt_issue_reason(previous_response: str, source_code: str, context: str) -> str:
+    return f"""
+    <Context>
+        {context}
+    </Context>
 
-        {
-            "count": <total count of the vulnerability hotspots in integer format>,
-            "p1Count": <count of high priority issues that can lead to security incidents in production leading to data loss, reputation loss>,
-            "p2Count": <count of vulnerability hotspots whose fix can be postponed in favor of other priority issues and bugs but they still need to be addressed eventually>,
-            "top5": <Array that will contain only the top 5 most pressing vulnerabilities, start picking them from the P1s and then move onto P2s if no P1s remain, refer "Top5 Array Json" for the format>,
-            "assessment": <A 2 line sentence that highlights the most pressing issues in the project and informs if this is production ready. This is to be read by a manager who might not undestand the technicalities being the issues.>
-        }
+    <Previous Response>
+        {previous_response}
+    </Previous Response>
 
-        "Top5": {
-            {
-                "issue": <a brief description of what the issue is, limit to a single sentence>,
-                "fixSteps": <A 1 sentence solution to fix the issue. The description is aimed at developers who will be reading this to fix the issue.>,
-                "consequences": <A 1 sentence description of the harms this issue can cause. Why is this a P1/ P2. The description is aimed at managers who might not understand the technicalities behind the issue>,
-                "priority": <one of P1 or P2 based on the severity. P1s can lead to security incidents in production leading to data loss, reputation loss, P2s can be postponed in favor of other priority issues but still need to be addressed eventually>
-            },
-            <repeat for a total of 5 issues in the array, start from P1s and include P2s to meet the count of 5.>
-        }
+    <Source Code>
+        {source_code}
+    </Source Code>
 
+    Given the context, source code, as well as your previous responses, respond to the user's query. I want to know why is this a security issue. 
 
+    Explain your reason in depth. 
+
+    Respond in the following JSON format only:
+
+    {{
+        "reason": <an in depth description of why is it an issue>
+        "fix": <description of issue fix>
+    }}
     """
 
-    return system_message, dev_output_structure_json, manager_output_structure_json
+def prompt_issue_fix(previous_response: str, source_code: str, context: str) -> str:
+    return f"""
+    <Context>
+        {context}
+    </Context>
+
+    <Previous Response>
+        {previous_response}
+    </Previous Response>
+
+    <Source Code>
+        {source_code}
+    </Source Code>
+
+    Given the context, source code, as well as your previous responses, respond to the user's query. I want to know what are the best ways to fix this a security issue. Give me multiple alternatives based on the context provided.
+
+    Explain why each provided fix would solve the security hotspot.
+
+    Also, explain the consequences of leaving this issue unfixed.
+
+    Respond in the following JSON format only:
+
+    {{
+        "fixes": [
+            {{
+                "fix": <description of the fix for security hotspot>
+                "reason": <description of why this fix will solve the issue>
+            }}
+        ],
+        "consequences": <in-depth description of negative impacts of leaving this issue unfixed>
+    }}
+    """
 
 def main():
 
@@ -224,19 +246,30 @@ def main():
         "messageFormattings": []
     }
 
-
-    # Retrieve relevant context
-    context_docs = retriever.invoke(hotspot["rule"]["name"])
-    context = " \n".join([doc.page_content for doc in context_docs])
-
     system_message, dev_json, manager_json = prompt()
 
     # Initialize model
     security_analyst = GenerativeModel(
         model="llama3.1:8b",
         system_messages=system_message,
-        output_structure=dev_json
     )
+
+    #first iteration of prompting
+    prompt_issue_identify = prompt_issue_identify()
+    prompt_issue_identify_response = security_analyst._reasoning(prompt_issue_identify_response)
+
+    #try catch needed if issue is not in the json
+    try:
+        issue = prompt_issue_identify_response["issue"]
+    except Exception as e:
+        print(e)
+
+    # search the RAG database and fetch the indexed documents that match the search query
+    rag = RagClient(collection_name="owasp_db")
+    context_docs = rag.get_context(query=issue, semantic_limit=100, ranked_limit=5)
+
+    # combine the context with the hotspots to form the input to the LLM
+    context = "----------------------".join([doc['heading_stack']+"\n"+doc['content'] for doc in context_docs])
 
     # Perform reasoning
     dev_output_json = security_analyst._reasoning(hotspot, context, dev_json)

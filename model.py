@@ -2,56 +2,46 @@ from ollama import chat
 from ollama import ChatResponse
 import json
 
+
+
+#initial prompt -> source code + hotspot -> what is the issue
+#second prompt -> source code + hotspot + prev response (identified issue) + prev response context (rag context based on prev response)-> why is this an issue?
+#third prompt -> source code + hotspot + prev response (identified issue, why is this an issue) + prev response context (rag context based on prev response)-> consequences and fix
 class GenerativeModel():
 
-    def __init__(self, model, system_messages, output_structure):
+    def __init__(self, model, system_messages):
         self.model = model
         self.system_messages = system_messages
-        self.output_structure = output_structure
-        self.reasoning_response = None
+
+        messages = [
+            {
+                'role' : 'system',
+                'content' : self.system_messages
+            }
+        ]
+
+        response = chat(model=self.model, messages=messages, stream = False)
+        # self.reasoning_response = response['message']['content']
+        # return self._parse_response(response['message']['content'])
+
+
     
-    def _reasoning(self, hotspot, context, json_structure):
+    def _reasoning(self, user_prompt):
         """
-        Perform reasoning analysis using:
-        - System message instructions
-        - Hotspot JSON data
-        - Retrieved context from vector store
+        The format used for every step of the LLM 
+        
         """
         messages = [
             {
-                'role': 'system', 
-                'content': self.system_messages
-            },
-            {
                 'role': 'user',
-                'content': f"""
-                Analyze this security hotspot with the provided context:
-
-                <Hotspot>
-                {json.dumps(hotspot, indent=2)}
-                </Hotspot>
-
-                <Context>
-                {context}
-                </Context>
-
-                Think step-by-step about:
-                1. Validity of the hotspot concerns
-                2. Potential attack vectors
-                3. Relevant security principles
-                4. Possible mitigation strategies
-
-                Finally give a JSON output as detailed below:
-                {json_structure}
-                Use double quotes ("") for the keys and values. 
-                """
+                'content': user_prompt
             }
         ]
         
         response = chat(model=self.model, messages=messages, format="json", stream = False)
         self.reasoning_response = response['message']['content']
         return self._parse_response(response['message']['content'])
-        
+
     
     def generate_report(self, json_output, latex_structure):
         """
