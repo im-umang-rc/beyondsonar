@@ -1,5 +1,7 @@
 from flask import Flask, jsonify, send_file, abort, request
 import json
+from dotenv import load_dotenv
+import os
 from rag.rag_client import RagClient
 from prompt import prompt, latext_format, prompt_issue_fix, prompt_issue_identify, prompt_issue_reason
 from model import GenerativeModel
@@ -15,7 +17,7 @@ def start():
 	hotspots = fetch_hotspots(project)
 
 	security_analyst = GenerativeModel(
-		model="llama3.1:latest",
+		model=os.environ.get("LLM_MODEL"),
 		system_messages=prompt(),
 	)
 

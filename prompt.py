@@ -194,7 +194,8 @@ def prompt_issue_fix(previous_response: str, source_code: str, context: str) -> 
                 "reason": <description of why this fix will solve the issue>
             }}
         ],
-        "consequences": <in-depth description of negative impacts of leaving this issue unfixed>
+        "consequences": <in-depth description of negative impacts of leaving this issue unfixed>,
+        "priority": <category of P1 or P2 depending on the severity of the consequences. If it cannot be pushed to production, it's a P1 else it's a P2>
     }}
     """
 

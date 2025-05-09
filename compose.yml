@@ -1,0 +1,25 @@
+networks:
+    beyondsonar:
+        driver: bridge
+volumes:
+    sonarqube:
+        driver: local
+    qdrant:
+        driver: local
+services:
+    sonarqube:
+        image: sonarqube:lts-community
+        ports:
+            - "9000:9000"
+        networks:
+            - beyondsonar
+        volumes:
+            - "sonarqube:/opt/sonarqube/data"
+    qdrant:
+        image: qdrant/qdrant:v1.13.6
+        ports:
+            - "6333:6333"
+        networks:
+            - beyondsonar
+        volumes:
+            - "qdrant:/qdrant/storage"
